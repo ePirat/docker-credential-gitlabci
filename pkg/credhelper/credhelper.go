@@ -40,7 +40,8 @@ func NewGitLabCredentialsHelper() credentials.Helper {
 }
 
 func parseRegistryURL(urlString string) (*url.URL, error) {
-	// If no scheme is given, assume https to we can properly parse
+	// If no scheme is given, use https as it is the default
+	// for docker registries
 	if !(strings.HasPrefix(urlString, "https://") ||
 		strings.HasPrefix(urlString, "http://")) {
 		urlString = "https://" + urlString
