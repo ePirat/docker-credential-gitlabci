@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/docker/docker-credential-helpers/credentials"
 )
@@ -38,6 +39,15 @@ func NewGitLabCredentialsHelper() credentials.Helper {
 	return &GitLabCredentialsHelper{}
 }
 
+func parseRegistryURL(urlString string) (*url.URL, error) {
+	// If no scheme is given, assume https to we can properly parse
+	if !(strings.HasPrefix(urlString, "https://") ||
+		strings.HasPrefix(urlString, "http://")) {
+		urlString = "https://" + urlString
+	}
+	return url.Parse(urlString)
+}
+
 func matchRegistryURL(serverURLString string) error {
 	// Read registry URL from predefined CI environment variable
 	// https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
@@ -45,11 +55,11 @@ func matchRegistryURL(serverURLString string) error {
 	if !urlFound {
 		return errors.New("no CI_REGISTRY env var set")
 	}
-	envURL, err := url.Parse(envURLString)
+	envURL, err := parseRegistryURL(envURLString)
 	if err != nil {
 		return fmt.Errorf("failed to parse CI_REGISTRY URL: %w", err)
 	}
-	serverURL, err := url.Parse(serverURLString)
+	serverURL, err := parseRegistryURL(serverURLString)
 	if err != nil {
 		return fmt.Errorf("failed to parse registry URL: %w", err)
 	}
