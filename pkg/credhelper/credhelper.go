@@ -66,6 +66,11 @@ func matchRegistryURL(serverURLString string) error {
 	if serverURL.Hostname() == "" || envURL.Hostname() == "" {
 		return errors.New("failed getting hosts for matching")
 	}
+	if serverURL.Scheme != envURL.Scheme {
+		return fmt.Errorf("protocol for '%s' does not match CI_REGISTRY host '%s'",
+			serverURLString,
+			envURLString)
+	}
 	if serverURL.Hostname() != envURL.Hostname() {
 		return fmt.Errorf("host '%s' does not match CI_REGISTRY host '%s'",
 			serverURL.Hostname(),
