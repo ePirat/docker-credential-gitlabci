@@ -63,6 +63,9 @@ func matchRegistryURL(serverURLString string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse registry URL: %w", err)
 	}
+	if serverURL.Hostname() == "" || envURL.Hostname() == "" {
+		return errors.New("failed getting hosts for matching")
+	}
 	if serverURL.Hostname() != envURL.Hostname() {
 		return fmt.Errorf("host '%s' does not match CI_REGISTRY host '%s'",
 			serverURL.Hostname(),
