@@ -47,7 +47,7 @@ func TestParseRegistryURL(t *testing.T) {
 
 func checkMatch(t *testing.T, envURL string, servURL string, match bool) {
 	t.Setenv("CI_REGISTRY", envURL)
-	err := matchRegistryURL(servURL)
+	err := matchEnvURL(servURL, "CI_REGISTRY")
 	if err != nil && match {
 		t.Errorf("Error matching URLs '%s' and '%s' even though they should match.",
 			envURL, servURL)
@@ -57,7 +57,7 @@ func checkMatch(t *testing.T, envURL string, servURL string, match bool) {
 	}
 }
 
-func TestMatchRegistryURL(t *testing.T) {
+func TestMatchEnvURL(t *testing.T) {
 	// Matches
 	checkMatch(t, "registry.example.org", "registry.example.org", true)
 	checkMatch(t, "https://registry.example.org", "registry.example.org", true)
@@ -75,4 +75,33 @@ func TestMatchRegistryURL(t *testing.T) {
 	checkMatch(t, "https://", "https://", false)
 	checkMatch(t, "https://", "", false)
 	checkMatch(t, "", "", false)
+}
+
+func TestGet(t *testing.T) {
+	t.Setenv("CI_REGISTRY", "registry.example.org")
+	t.Setenv("CI_REGISTRY_USER", "gitlab-ci-token")
+	t.Setenv("CI_REGISTRY_PASSWORD", "registry-token")
+	t.Setenv("CI_DEPENDENCY_PROXY_SERVER", "gitlab.example.org:443")
+	t.Setenv("CI_DEPENDENCY_PROXY_USER", "gitlab-dependency-proxy")
+	t.Setenv("CI_DEPENDENCY_PROXY_PASSWORD", "proxy-token")
+
+	helper := NewGitLabCredentialsHelper()
+	servers := []string{"registry.example.org", "gitlab.example.org", "gitlab.example.org:443"}
+	expectedUsers := []string{"gitlab-ci-token", "gitlab-dependency-proxy", "gitlab-dependency-proxy"}
+	expectedPasswords := []string{"registry-token", "proxy-token", "proxy-token"}
+	for i, server := range servers {
+		user, pass, err := helper.Get(server)
+		if err != nil {
+			t.Errorf("Got error for '%s': %s", server, err)
+		}
+		if user != expectedUsers[i] || pass != expectedPasswords[i] {
+			t.Errorf("Got credentials '%s'/'%s' for '%s', expected '%s'/'%s'",
+				user, pass, server, expectedUsers[i], expectedPasswords[i])
+		}
+	}
+
+	_, _, err := helper.Get("registry.example.com")
+	if err == nil {
+		t.Error("Unexpected match of a host that is neither registry nor dependency proxy.")
+	}
 }

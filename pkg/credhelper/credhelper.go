@@ -49,16 +49,14 @@ func parseRegistryURL(urlString string) (*url.URL, error) {
 	return url.Parse(urlString)
 }
 
-func matchRegistryURL(serverURLString string) error {
-	// Read registry URL from predefined CI environment variable
-	// https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
-	envURLString, urlFound := os.LookupEnv("CI_REGISTRY")
+func matchEnvURL(serverURLString string, serverVar string) error {
+	envURLString, urlFound := os.LookupEnv(serverVar)
 	if !urlFound {
-		return errors.New("no CI_REGISTRY env var set")
+		return fmt.Errorf("no %s env var set", serverVar)
 	}
 	envURL, err := parseRegistryURL(envURLString)
 	if err != nil {
-		return fmt.Errorf("failed to parse CI_REGISTRY URL: %w", err)
+		return fmt.Errorf("failed to parse %s URL: %w", serverVar, err)
 	}
 	serverURL, err := parseRegistryURL(serverURLString)
 	if err != nil {
@@ -68,13 +66,15 @@ func matchRegistryURL(serverURLString string) error {
 		return errors.New("failed getting hosts for matching")
 	}
 	if serverURL.Scheme != envURL.Scheme {
-		return fmt.Errorf("protocol for '%s' does not match CI_REGISTRY host '%s'",
+		return fmt.Errorf("protocol for '%s' does not match %s host '%s'",
 			serverURLString,
+			serverVar,
 			envURLString)
 	}
 	if serverURL.Hostname() != envURL.Hostname() {
-		return fmt.Errorf("host '%s' does not match CI_REGISTRY host '%s'",
+		return fmt.Errorf("host '%s' does not match %s host '%s'",
 			serverURL.Hostname(),
+			serverVar,
 			envURL.Hostname())
 	}
 	return nil
@@ -88,19 +88,31 @@ func (credHelper GitLabCredentialsHelper) Delete(serverURL string) error {
 	return ErrUnsupportedOperation
 }
 
-func (credHelper GitLabCredentialsHelper) Get(serverURL string) (string, string, error) {
-	if err := matchRegistryURL(serverURL); err != nil {
-		return "", "", fmt.Errorf("server URL does not match CI_REGISTRY URL: %w", err)
-	}
-	user, found := os.LookupEnv("CI_REGISTRY_USER")
+func credentialsFrom(userVar string, passVar string) (string, string, error) {
+	user, found := os.LookupEnv(userVar)
 	if !found {
-		return "", "", errors.New("no CI_REGISTRY_USER env var set")
+		return "", "", fmt.Errorf("no %s env var set", userVar)
 	}
-	pass, found := os.LookupEnv("CI_REGISTRY_PASSWORD")
+	pass, found := os.LookupEnv(passVar)
 	if !found {
-		return "", "", errors.New("no CI_REGISTRY_PASSWORD env var set")
+		return "", "", fmt.Errorf("no %s env var set", passVar)
 	}
 	return user, pass, nil
+}
+
+func (credHelper GitLabCredentialsHelper) Get(serverURL string) (string, string, error) {
+	// Registry URLs and credentials come from predefined CI environment variables
+	// https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+	registryErr := matchEnvURL(serverURL, "CI_REGISTRY")
+	if registryErr == nil {
+		return credentialsFrom("CI_REGISTRY_USER", "CI_REGISTRY_PASSWORD")
+	}
+	proxyErr := matchEnvURL(serverURL, "CI_DEPENDENCY_PROXY_SERVER")
+	if proxyErr == nil {
+		return credentialsFrom("CI_DEPENDENCY_PROXY_USER", "CI_DEPENDENCY_PROXY_PASSWORD")
+	}
+	return "", "", fmt.Errorf("server URL '%s' matches neither CI_REGISTRY (%w) nor CI_DEPENDENCY_PROXY_SERVER (%v)",
+		serverURL, registryErr, proxyErr)
 }
 
 func (credHelper GitLabCredentialsHelper) List() (map[string]string, error) {
