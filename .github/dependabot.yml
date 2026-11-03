@@ -1,0 +1,27 @@
+---
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 0
+    allow:
+      - dependency-type: all
+    groups:
+      gomod:
+        update-types:
+          - "patch"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 0
+    groups:
+      actions:
+        update-types:
+          - "minor"
+          - "patch"
